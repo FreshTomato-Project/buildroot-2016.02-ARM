@@ -127,10 +127,10 @@ HOST_GCC_COMMON_CONF_OPTS += --disable-libmpx
 endif
 
 # quadmath support requires wchar
-ifeq ($(BR2_USE_WCHAR)$(BR2_TOOLCHAIN_HAS_LIBQUADMATH),yy)
-HOST_GCC_COMMON_CONF_OPTS += --enable-libquadmath
-else
+ifneq ($(BR2_TOOLCHAIN_BUILDROOT_WCHAR),y)
 HOST_GCC_COMMON_CONF_OPTS += --disable-libquadmath
+else
+HOST_GCC_COMMON_CONF_OPTS += --enable-libquadmath
 endif
 
 # libsanitizer requires wordexp, not in default uClibc config. Also
