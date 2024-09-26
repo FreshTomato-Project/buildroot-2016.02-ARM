@@ -7,9 +7,14 @@ ret=$?
 [ $ret -ne 0 ] && {
 	echo -e "\nAn error occurred while building the toolchain!\n\n"
 } || {
+	[ $(cat .config | grep "BR2_GCC_VERSION=\"7.3.0\"") ] && {
+		TOOLCHAIN=./output/hndtools-arm-uclibc-7.3/usr
+	} || {
+		TOOLCHAIN=./output/hndtools-arm-uclibc-5.3/usr
+	}
+
 	FILES=./dl_save/files
 	HERE=$(pwd)
-	TOOLCHAIN=./output/hndtools-arm-uclibc-5.3/usr
 	SYSROOT=$TOOLCHAIN/arm-brcm-linux-uclibcgnueabi/sysroot
 
 	cd $TOOLCHAIN

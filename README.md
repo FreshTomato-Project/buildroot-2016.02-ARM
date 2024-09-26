@@ -6,18 +6,19 @@
   
   
 To build the toolchain:
-
-1. Pack the ```/home/[username]/freshtomato-arm/release/src-rt-6.x.4708/linux/linux-2.6.36``` subdirectory into ```linux-2.6.36.4.tar.xz``` file and put it in the dl_save folder in buildroot.
-
-
-2. Run:
+  
+1. Generate an archive of the ```/home/[username]/freshtomato-arm/release/src-rt-6.x.4708/linux/linux-2.6.36``` directory to the file ```linux-2.6.36.4.tar.xz``` and place it in the dl_save folder in buildroot.
+  
+2. To build toolchain with gcc-7.3 and binutils-2.28.1 (not fully working yet, experimental!), rename file ```.config-7.3``` to ```.config``` in main directory.
+  
+3. Run:
 
 ```sh
 ./build-toolchain.sh
 ```
   
   
-New toolchain is available in ```output/hndtools-arm-uclibc-5.3```.
+New toolchain is available in ```output/hndtools-arm-uclibc-5.3``` (or ```output/hndtools-arm-uclibc-7.3``` for gcc-7.3 version).
   
 Enjoy!
   
