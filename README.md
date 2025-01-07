@@ -1,8 +1,7 @@
 # **buildroot-2016.02-ARM** #
   
   
-** Ready-to-use buildroot for ARM branch - tested on Debian 12 **
-** with gcc-5.3, binutils-2.25.1, gmp-6.1.0, mpc-1.0.3, mpfr-3.1.3... **
+** Ready-to-use buildroot for ARM branch - tested on Debian 12 (with gcc-5.3, binutils-2.25.1, gmp-6.1.0, mpc-1.0.3, mpfr-3.1.3...) **
   
   
 To build the toolchain:
@@ -16,7 +15,6 @@ To build the toolchain:
 ```sh
 ./build-toolchain.sh
 ```
-  
   
 New toolchain is available in ```output/hndtools-arm-uclibc-5.3``` (or ```output/hndtools-arm-uclibc-7.3``` for gcc-7.3 version).
   
