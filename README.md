@@ -1,7 +1,7 @@
 # **buildroot-2016.02-ARM** #
   
   
-** Ready-to-use buildroot for ARM branch - tested on Debian 12 (with gcc-5.3, binutils-2.25.1, gmp-6.1.0, mpc-1.0.3, mpfr-3.1.3...) **
+**Ready-to-use buildroot for ARM branch - tested on Debian 12 (with gcc-5.3, binutils-2.25.1, gmp-6.1.0, mpc-1.0.3, mpfr-3.1.3...)**
   
   
 To build the toolchain:
