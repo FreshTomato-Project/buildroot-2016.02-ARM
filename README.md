@@ -6,12 +6,18 @@
   
 To build the toolchain:
   
-1. Generate an archive of the ```/home/[username]/freshtomato-arm/release/src-rt-6.x.4708/linux/linux-2.6.36``` directory to the file ```linux-2.6.36.4.tar.xz``` and place it in the dl_save folder in buildroot.
+1. Generate an archive of the linux sources in FT repo (file name has to be "linux-2.6.36.4.tar.xz") and place the archive into the buildroot's dl_save folder:
   
-2. To build toolchain with gcc-7.3 and binutils-2.28.1 (not fully working yet, experimental!), rename file ```.config-7.3``` to ```.config``` in main directory.
+```sh
+		cd $HOME/freshtomato-arm/release/src-rt-6.x.4708/linux
+		tar cJvf linux-2.6.36.4.tar.xz linux-2.6.36
+		mv linux-2.6.36.4.tar.xz $HOME/buildroot-2016.02-ARM/dl_save
+```
+  
+2. To build toolchain with gcc-7.3 and binutils-2.28.1 (not fully working yet, experimental!), rename file ```.config-7.3``` to ```.config``` in main buildroot directory.
   
 3. Run:
-
+  
 ```sh
 ./build-toolchain.sh
 ```
