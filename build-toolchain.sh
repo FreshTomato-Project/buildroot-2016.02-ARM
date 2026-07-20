@@ -7,11 +7,13 @@ ret=$?
 [ $ret -ne 0 ] && {
 	echo -e "\nAn error occurred while building the toolchain!\n\n"
 } || {
-	[ $(cat .config | grep "BR2_GCC_VERSION=\"7.3.0\"") ] && {
+	if [ $(cat .config | grep "BR2_GCC_VERSION=\"7.3.0\"") ]; then
 		TOOLCHAIN=./output/hndtools-arm-uclibc-7.3/usr
-	} || {
+	elif [ $(cat .config | grep "BR2_GCC_VERSION=\"7.5.0\"") ]; then
+		TOOLCHAIN=./output/hndtools-arm-uclibc-7.5/usr
+	else
 		TOOLCHAIN=./output/hndtools-arm-uclibc-5.3/usr
-	}
+	fi
 
 	FILES=./dl_save/files
 	HERE=$(pwd)

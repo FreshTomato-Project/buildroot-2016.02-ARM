@@ -16,13 +16,15 @@ To build the toolchain:
   
 2. To build toolchain with gcc-7.3 and binutils-2.28.1 (not fully working yet, experimental!), rename file ```.config-7.3``` to ```.config``` in main buildroot directory.
   
-3. Run:
+3. To build toolchain with gcc-7.5 and binutils-2.29.1 (not fully working yet, experimental!), rename file ```.config-7.5``` to ```.config``` in main buildroot directory.
+  
+4. Run:
   
 ```sh
 ./build-toolchain.sh
 ```
   
-New toolchain is available in ```output/hndtools-arm-uclibc-5.3``` (or ```output/hndtools-arm-uclibc-7.3``` for gcc-7.3 version).
+New toolchain is available in ```output/hndtools-arm-uclibc-5.3``` (or ```output/hndtools-arm-uclibc-7.X``` for gcc-7.X version).
   
 Enjoy!
   
