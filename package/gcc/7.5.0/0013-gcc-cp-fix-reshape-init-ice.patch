@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FreshTomato
+Date: Tue, 21 Jul 2026 00:00:00 +0200
+Subject: [PATCH] gcc/cp: do not reshape an already digested initializer
+
+Backport of the GCC fix for PR c++/80864 / PR c++/89083.
+
+GCC 7 can attempt to reshape an aggregate initializer more than once in
+constexpr/template contexts.  The second pass sees a CONSTRUCTOR that
+already has the target type and aborts in reshape_init_r with:
+
+  internal compiler error: in reshape_init_r, at cp/decl.c
+
+A CONSTRUCTOR whose type already matches the target is a previously
+digested initializer, so consume and return it without reshaping it.
+
+Upstream reference:
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80864
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=89083
+
+Signed-off-by: FreshTomato build
+---
+ gcc/cp/decl.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/gcc/cp/decl.c b/gcc/cp/decl.c
+--- a/gcc/cp/decl.c
++++ b/gcc/cp/decl.c
+@@ -6063,6 +6063,14 @@ reshape_init_r (tree type, reshape_iter *d, bool first_initializer_p,
+ 	     before calling digest_init, so changing this code would still
+ 	     not be necessary.  */
+ 	    gcc_assert (!BRACE_ENCLOSED_INITIALIZER_P (init));
++	 /* A CONSTRUCTOR of the target's type is a previously digested
++	    initializer.  Do not try to reshape it a second time.  */
++	 else if (same_type_ignoring_top_level_qualifiers_p
++		    (type, TREE_TYPE (init)))
++	   {
++	     ++d->cur;
++	     return init;
++	   }
+ 	  else
+ 	    {
+ 	      ++d->cur;
+-- 
+2.39.5
