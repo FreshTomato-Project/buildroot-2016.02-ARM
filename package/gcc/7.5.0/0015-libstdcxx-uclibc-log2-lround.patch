@@ -1,0 +1,89 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FreshTomato
+Date: Tue, 21 Jul 2026 00:00:00 +0200
+Subject: [PATCH] libstdc++: expose log2 and lround for uClibc C++11 builds
+
+Older uClibc configurations provide the required libm entry points, but
+libstdc++ disables the complete C99 math block when
+_GLIBCXX_USE_C99_MATH_TR1 is not defined.  As a result, valid C++11
+functions such as std::log2 and std::lround are absent from <cmath>.
+
+Do not enable the entire C99 block for uClibc, because some old uClibc
+headers do not declare every long-double C99 function.  Instead provide
+the two required overload sets through GCC builtins when the normal
+libstdc++ C99 math support is disabled.
+
+---
+ libstdc++-v3/include/c_global/cmath | 60 ++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+
+diff --git a/libstdc++-v3/include/c_global/cmath b/libstdc++-v3/include/c_global/cmath
+--- a/libstdc++-v3/include/c_global/cmath
++++ b/libstdc++-v3/include/c_global/cmath
+@@ -958,6 +958,64 @@ _GLIBCXX_END_NAMESPACE_VERSION
+ 
+ #if __cplusplus >= 201103L
+ 
++#if defined(__UCLIBC__) && !defined(_GLIBCXX_USE_C99_MATH_TR1)
++
++// Old uClibc configurations often fail libstdc++'s all-or-nothing
++// C99 math configure test, even though these functions are available.
++#undef log2
++#undef log2f
++#undef log2l
++#undef lround
++#undef lroundf
++#undef lroundl
++
++namespace std _GLIBCXX_VISIBILITY(default)
++{
++_GLIBCXX_BEGIN_NAMESPACE_VERSION
++
++  inline _GLIBCXX_CONSTEXPR float
++  log2(float __x)
++  { return __builtin_log2f(__x); }
++
++  inline _GLIBCXX_CONSTEXPR double
++  log2(double __x)
++  { return __builtin_log2(__x); }
++
++  inline _GLIBCXX_CONSTEXPR long double
++  log2(long double __x)
++  { return __builtin_log2l(__x); }
++
++  template<typename _Tp>
++    inline _GLIBCXX_CONSTEXPR
++    typename __gnu_cxx::__enable_if<__is_integer<_Tp>::__value,
++                                    double>::__type
++    log2(_Tp __x)
++    { return __builtin_log2(__x); }
++
++  inline long int
++  lround(float __x)
++  { return __builtin_lroundf(__x); }
++
++  inline long int
++  lround(double __x)
++  { return __builtin_lround(__x); }
++
++  inline long int
++  lround(long double __x)
++  { return __builtin_lroundl(__x); }
++
++  template<typename _Tp>
++    inline typename
++    __gnu_cxx::__enable_if<__is_integer<_Tp>::__value,
++                           long int>::__type
++    lround(_Tp __x)
++    { return __builtin_lround(__x); }
++
++_GLIBCXX_END_NAMESPACE_VERSION
++} // namespace std
++
++#endif // uClibc fallback without _GLIBCXX_USE_C99_MATH_TR1
++
+ #ifdef _GLIBCXX_USE_C99_MATH_TR1
+ 
+ #undef acosh
+-- 
+2.39.5

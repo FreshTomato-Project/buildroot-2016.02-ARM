@@ -1,0 +1,219 @@
+commit 26828c017926fc2b32f6bb399463f0525b08ebac
+Author: Jason Merrill <jason@redhat.com>
+Date:   Thu Aug 10 11:47:27 2017 -0400
+
+            PR c++/80452 - Core 1579, implicit move semantics on return/throw
+    
+            * cp-tree.h (LOOKUP_PREFER_RVALUE): Now means that we've already
+            tentatively changed the lvalue to an rvalue.
+            * call.c (reference_binding): Remove LOOKUP_PREFER_RVALUE handling.
+            (build_over_call): If LOOKUP_PREFER_RVALUE, check that the first
+            parameter is an rvalue reference.
+            * except.c (build_throw): Do maybe-rvalue overload resolution twice.
+            * typeck.c (check_return_expr): Likewise.
+
+diff --git a/gcc/cp/call.c b/gcc/cp/call.c
+index 4903119..3790299 100644
+--- a/gcc/cp/call.c
++++ b/gcc/cp/call.c
+@@ -101,7 +101,7 @@ struct conversion {
+   /* If KIND is ck_ref_bind, true when either an lvalue reference is
+      being bound to an lvalue expression or an rvalue reference is
+      being bound to an rvalue expression.  If KIND is ck_rvalue,
+-     true when we should treat an lvalue as an rvalue (12.8p33).  If
++     true when we are treating an lvalue as an rvalue (12.8p33).  If
+      KIND is ck_base, always false.  */
+   BOOL_BITFIELD rvaluedness_matches_p: 1;
+   BOOL_BITFIELD check_narrowing: 1;
+@@ -1161,6 +1161,7 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
+ 	}
+       conv = build_conv (ck_rvalue, from, conv);
+       if (flags & LOOKUP_PREFER_RVALUE)
++	/* Tell convert_like_real to set LOOKUP_PREFER_RVALUE.  */
+ 	conv->rvaluedness_matches_p = true;
+     }
+ 
+@@ -1629,11 +1630,7 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
+       conv = build_identity_conv (tfrom, expr);
+       conv = direct_reference_binding (rto, conv);
+ 
+-      if (flags & LOOKUP_PREFER_RVALUE)
+-	/* The top-level caller requested that we pretend that the lvalue
+-	   be treated as an rvalue.  */
+-	conv->rvaluedness_matches_p = TYPE_REF_IS_RVALUE (rto);
+-      else if (TREE_CODE (rfrom) == REFERENCE_TYPE)
++      if (TREE_CODE (rfrom) == REFERENCE_TYPE)
+ 	/* Handle rvalue reference to function properly.  */
+ 	conv->rvaluedness_matches_p
+ 	  = (TYPE_REF_IS_RVALUE (rto) == TYPE_REF_IS_RVALUE (rfrom));
+@@ -1659,8 +1656,7 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
+       /* Don't allow binding of lvalues (other than function lvalues) to
+ 	 rvalue references.  */
+       if (is_lvalue && TYPE_REF_IS_RVALUE (rto)
+-	  && TREE_CODE (to) != FUNCTION_TYPE
+-          && !(flags & LOOKUP_PREFER_RVALUE))
++	  && TREE_CODE (to) != FUNCTION_TYPE)
+ 	conv->bad_p = true;
+ 
+       /* Nor the reverse.  */
+@@ -6917,6 +6913,7 @@ convert_like_real (conversion *convs, tree expr, tree fn, int argnum,
+       else
+ 	flags |= LOOKUP_ONLYCONVERTING;
+       if (convs->rvaluedness_matches_p)
++	/* standard_conversion got LOOKUP_PREFER_RVALUE.  */
+ 	flags |= LOOKUP_PREFER_RVALUE;
+       if (TREE_CODE (expr) == TARGET_EXPR
+ 	  && TARGET_EXPR_LIST_INIT_P (expr))
+@@ -7716,6 +7713,19 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
+ 	  ++arg_index;
+ 	  parm = TREE_CHAIN (parm);
+ 	}
++
++      if (flags & LOOKUP_PREFER_RVALUE)
++	{
++	  /* The implicit move specified in 15.8.3/3 fails "...if the type of
++	     the first parameter of the selected constructor is not an rvalue
++	     reference to the object’s type (possibly cv-qualified)...." */
++	  gcc_assert (!(complain & tf_error));
++	  tree ptype = convs[0]->type;
++	  if (TREE_CODE (ptype) != REFERENCE_TYPE
++	      || !TYPE_REF_IS_RVALUE (ptype)
++	      || CONVERSION_RANK (convs[0]) > cr_exact)
++	    return error_mark_node;
++	}
+     }
+   /* Bypass access control for 'this' parameter.  */
+   else if (TREE_CODE (TREE_TYPE (fn)) == METHOD_TYPE)
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index 3a0bd16..6c4153d 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -5296,7 +5296,7 @@ enum overload_flags { NO_SPECIAL = 0, DTOR_FLAG, TYPENAME_FLAG };
+    (Normally, these entities are registered in the symbol table, but
+    not found by lookup.)  */
+ #define LOOKUP_HIDDEN (LOOKUP_PREFER_NAMESPACES << 1)
+-/* Prefer that the lvalue be treated as an rvalue.  */
++/* We're trying to treat an lvalue as an rvalue.  */
+ #define LOOKUP_PREFER_RVALUE (LOOKUP_HIDDEN << 1)
+ /* We're inside an init-list, so narrowing conversions are ill-formed.  */
+ #define LOOKUP_NO_NARROWING (LOOKUP_PREFER_RVALUE << 1)
+diff --git a/gcc/cp/except.c b/gcc/cp/except.c
+index 208e52a..b25b91b 100644
+--- a/gcc/cp/except.c
++++ b/gcc/cp/except.c
+@@ -665,6 +665,7 @@ build_throw (tree exp)
+ 	{
+ 	  int flags = LOOKUP_NORMAL | LOOKUP_ONLYCONVERTING;
+ 	  vec<tree, va_gc> *exp_vec;
++	  bool converted = false;
+ 
+ 	  /* Under C++0x [12.8/16 class.copy], a thrown lvalue is sometimes
+ 	     treated as an rvalue for the purposes of overload resolution
+@@ -675,14 +676,31 @@ build_throw (tree exp)
+ 	      && ! TREE_STATIC (exp)
+ 	      /* The variable must not have the `volatile' qualifier.  */
+ 	      && !(cp_type_quals (TREE_TYPE (exp)) & TYPE_QUAL_VOLATILE))
+-	    flags = flags | LOOKUP_PREFER_RVALUE;
++	    {
++	      tree moved = move (exp);
++	      exp_vec = make_tree_vector_single (moved);
++	      moved = (build_special_member_call
++		       (object, complete_ctor_identifier, &exp_vec,
++			TREE_TYPE (object), flags|LOOKUP_PREFER_RVALUE,
++			tf_none));
++	      release_tree_vector (exp_vec);
++	      if (moved != error_mark_node)
++		{
++		  exp = moved;
++		  converted = true;
++		}
++	    }
+ 
+ 	  /* Call the copy constructor.  */
+-	  exp_vec = make_tree_vector_single (exp);
+-	  exp = (build_special_member_call
+-		 (object, complete_ctor_identifier, &exp_vec,
+-		  TREE_TYPE (object), flags, tf_warning_or_error));
+-	  release_tree_vector (exp_vec);
++	  if (!converted)
++	    {
++	      exp_vec = make_tree_vector_single (exp);
++	      exp = (build_special_member_call
++		     (object, complete_ctor_identifier, &exp_vec,
++		      TREE_TYPE (object), flags, tf_warning_or_error));
++	      release_tree_vector (exp_vec);
++	    }
++
+ 	  if (exp == error_mark_node)
+ 	    {
+ 	      error ("  in thrown expression");
+diff --git a/gcc/cp/typeck.c b/gcc/cp/typeck.c
+index 3ce3906..a5a363b 100644
+--- a/gcc/cp/typeck.c
++++ b/gcc/cp/typeck.c
+@@ -9156,6 +9156,7 @@ check_return_expr (tree retval, bool *no_warning)
+ 
+          Note that these conditions are similar to, but not as strict as,
+ 	 the conditions for the named return value optimization.  */
++      bool converted = false;
+       if ((cxx_dialect != cxx98)
+           && ((VAR_P (retval) && !DECL_HAS_VALUE_EXPR_P (retval))
+ 	      || TREE_CODE (retval) == PARM_DECL)
+@@ -9163,14 +9164,25 @@ check_return_expr (tree retval, bool *no_warning)
+ 	  && !TREE_STATIC (retval)
+ 	  /* This is only interesting for class type.  */
+ 	  && CLASS_TYPE_P (functype))
+-	flags = flags | LOOKUP_PREFER_RVALUE;
++	{
++	  tree moved = move (retval);
++	  moved = convert_for_initialization
++	    (NULL_TREE, functype, moved, flags|LOOKUP_PREFER_RVALUE,
++	     ICR_RETURN, NULL_TREE, 0, tf_none);
++	  if (moved != error_mark_node)
++	    {
++	      retval = moved;
++	      converted = true;
++	    }
++	}
+ 
+       /* First convert the value to the function's return type, then
+ 	 to the type of return value's location to handle the
+ 	 case that functype is smaller than the valtype.  */
+-      retval = convert_for_initialization
+-	(NULL_TREE, functype, retval, flags, ICR_RETURN, NULL_TREE, 0,
+-         tf_warning_or_error);
++      if (!converted)
++	retval = convert_for_initialization
++	  (NULL_TREE, functype, retval, flags, ICR_RETURN, NULL_TREE, 0,
++	   tf_warning_or_error);
+       retval = convert (valtype, retval);
+ 
+       /* If the conversion failed, treat this just like `return;'.  */
+diff --git a/gcc/testsuite/g++.dg/cpp0x/move-return1.C b/gcc/testsuite/g++.dg/cpp0x/move-return1.C
+new file mode 100644
+index 0000000..dc2b313
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/move-return1.C
+@@ -0,0 +1,22 @@
++// PR c++/80452
++// { dg-do compile { target c++11 } }
++
++template<typename> struct check { };
++template<typename T> struct check<T&>;
++
++struct A {
++  A() = default;
++  A(A&&) = default;
++  A(const A&) = delete;
++};
++
++template <class T>
++struct B {
++  template <class U> B(U&&) { check<U> u; }
++};
++
++B<A> f()
++{
++  A a;
++  return a;
++}

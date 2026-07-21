@@ -1,0 +1,91 @@
+From 873c5188fd50000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 25 May 2021 00:00:00 +0000
+Subject: [PATCH] c++: implicit deduction guides, protected access [PR85790]
+
+Backport GCC r12-926 (873c5188fd5) to GCC 7.5.0.
+
+An implicit deduction guide generated from a constructor must have access
+to the same class members as the constructor.  Without a class context,
+GCC 7 can reject or ICE on C++17 class template argument deduction when
+a constructor's default argument refers to a protected member.
+
+This is triggered by RapidJSON PrettyWriter/Writer and can result in:
+
+  internal compiler error: unexpected expression 'writeFlags'
+  of kind template_parm_index
+
+gcc/cp/ChangeLog:
+
+	PR c++/85790
+	* pt.c (build_deduction_guide): Treat the implicit deduction guide
+	as a member of the class.
+
+gcc/testsuite/ChangeLog:
+
+	PR c++/85790
+	* g++.dg/cpp1z/class-deduction-access1.C: New test.
+	* g++.dg/cpp1z/class-deduction-access2.C: New test.
+
+---
+ gcc/cp/pt.c                                      |  3 +++
+ gcc/testsuite/g++.dg/cpp1z/class-deduction-access1.C | 18 ++++++++++++++++++
+ gcc/testsuite/g++.dg/cpp1z/class-deduction-access2.C | 10 ++++++++++
+ 3 files changed, 31 insertions(+)
+
+diff --git a/gcc/cp/pt.c b/gcc/cp/pt.c
+--- a/gcc/cp/pt.c
++++ b/gcc/cp/pt.c
+@@ -25397,6 +25397,9 @@ build_deduction_guide (tree ctor, tree outer_args,
+     DECL_ABSTRACT_ORIGIN (ded_fn) = ctor;
+   if (ci)
+     set_constraints (ded_tmpl, ci);
++  /* The artificial deduction guide should have same access as the
++     constructor.  */
++  DECL_CONTEXT (ded_fn) = type;
+ 
+   return ded_tmpl;
+ }
+diff --git a/gcc/testsuite/g++.dg/cpp1z/class-deduction-access1.C b/gcc/testsuite/g++.dg/cpp1z/class-deduction-access1.C
+new file mode 100644
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/class-deduction-access1.C
+@@ -0,0 +1,18 @@
++// PR c++/85790
++// { dg-do compile { target c++17 } }
++
++template<typename T>
++struct Base
++{
++protected:
++  using type = T;
++};
++
++template<typename T>
++struct Cont : Base<T>
++{
++  using argument_type = typename Base<T>::type;
++
++  Cont(T, argument_type) { }
++};
++
++Cont c(1, 1);
+diff --git a/gcc/testsuite/g++.dg/cpp1z/class-deduction-access2.C b/gcc/testsuite/g++.dg/cpp1z/class-deduction-access2.C
+new file mode 100644
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/class-deduction-access2.C
+@@ -0,0 +1,10 @@
++// PR c++/85790
++// { dg-do compile { target c++17 } }
++
++struct B {
++protected:
++  struct type {};
++};
++
++template<typename T> struct D : B {
++  D(T, typename T::type);
++};
++D c = {B(), {}};
+-- 
+2.39.5

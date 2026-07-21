@@ -1,0 +1,37 @@
+From 041bc6e3328573ab1f5fea69d0b1582395664753 Mon Sep 17 00:00:00 2001
+From: Jason Merrill <jason@redhat.com>
+Date: Fri, 9 Mar 2018 17:29:00 -0500
+Subject: [PATCH] PR c++/84785 - ICE with alias template and default targs
+
+Backport adapted to the GCC 7.5.0 source layout used by the
+FreshTomato toolchain.
+
+gcc/cp/
+	PR c++/84785
+	* pt.c (type_unification_real): Set processing_template_decl while
+	substituting an argument that still contains undeduced template
+	parameters.
+
+---
+ gcc/cp/pt.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/gcc/cp/pt.c b/gcc/cp/pt.c
+--- a/gcc/cp/pt.c
++++ b/gcc/cp/pt.c
+@@ -19518,7 +19518,13 @@ type_unification_real (tree tparms,
+ 	  location_t save_loc = input_location;
+ 	  if (DECL_P (parm))
+ 	    input_location = DECL_SOURCE_LOCATION (parm);
++
++    if (saw_undeduced == 1)
++      ++processing_template_decl;
+ 	  arg = tsubst_template_arg (arg, full_targs, complain, NULL_TREE);
++    if (saw_undeduced == 1)
++      --processing_template_decl;
++
+ 	  if (!uses_template_parms (arg))
+ 	    arg = convert_template_argument (parm, arg, full_targs, complain,
+ 					     i, NULL_TREE);
+-- 
+2.39.5
