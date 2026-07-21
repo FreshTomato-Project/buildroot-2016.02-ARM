@@ -1,7 +1,7 @@
 # **buildroot-2016.02-ARM** #
   
   
-**Ready-to-use buildroot for ARM branch - tested on Debian 12 (with gcc-5.3, binutils-2.25.1, gmp-6.1.0, mpc-1.0.3, mpfr-3.1.3...)**
+**Ready-to-use buildroot for ARM branch - tested on Debian 12 (with gcc-5.3/7.3/7.5, binutils-2.25.1/2.28.1/2.29.1, gmp-6.1.0/6.3.0, mpc-1.0.3/1.3.1, mpfr-3.1.3/4.2.1...)**
   
   
 To build the toolchain:
@@ -14,17 +14,15 @@ To build the toolchain:
 		mv linux-2.6.36.4.tar.xz $HOME/buildroot-2016.02-ARM/dl_save
 ```
   
-2. To build toolchain with gcc-7.3 and binutils-2.28.1 (not fully working yet, experimental!), rename file ```.config-7.3``` to ```.config``` in main buildroot directory.
+2. By default, the toolchain is built with gcc 7.5.0. To build with a different one, rename the appropriate file to ```.config``` in main buildroot directory.
   
-3. To build toolchain with gcc-7.5 and binutils-2.29.1 (not fully working yet, experimental!), rename file ```.config-7.5``` to ```.config``` in main buildroot directory.
-  
-4. Run:
+3. Run:
   
 ```sh
 ./build-toolchain.sh
 ```
   
-New toolchain is available in ```output/hndtools-arm-uclibc-5.3``` (or ```output/hndtools-arm-uclibc-7.X``` for gcc-7.X version).
+New toolchain is available in ```output/hndtools-arm-uclibc-5.3/7.3/7.5```.
   
 Enjoy!
   
