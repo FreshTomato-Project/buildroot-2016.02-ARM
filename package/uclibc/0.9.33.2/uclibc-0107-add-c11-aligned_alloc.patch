@@ -1,0 +1,59 @@
+diff -ruN a/include/stdlib.h b/include/stdlib.h
+--- a/include/stdlib.h	2012-05-15 07:20:09.000000000 +0000
++++ b/include/stdlib.h	2026-09-10 12:34:45.231706885 +0000
+@@ -528,6 +528,12 @@
+      __THROW __nonnull ((1)) __wur;
+ #endif
+ 
++#ifdef __USE_ISOC11
++/* Allocate SIZE bytes on a boundary aligned to ALIGNMENT.  */
++extern void *aligned_alloc (size_t __alignment, size_t __size)
++     __THROW __attribute_malloc__ __wur;
++#endif
++
+ __BEGIN_NAMESPACE_STD
+ /* Abort execution and generate a core-dump.  */
+ extern void abort (void) __THROW __attribute__ ((__noreturn__));
+diff -ruN a/libc/stdlib/Makefile.in b/libc/stdlib/Makefile.in
+--- a/libc/stdlib/Makefile.in	2012-05-15 07:20:09.000000000 +0000
++++ b/libc/stdlib/Makefile.in	2026-09-10 12:34:45.232205619 +0000
+@@ -17,7 +17,7 @@
+ 	getpt.c drand48-iter.c jrand48.c \
+ 	jrand48_r.c lrand48.c lrand48_r.c mrand48.c mrand48_r.c nrand48.c \
+ 	nrand48_r.c rand_r.c srand48.c srand48_r.c seed48.c seed48_r.c \
+-	valloc.c a64l.c l64a.c __uc_malloc.c
++	valloc.c a64l.c l64a.c __uc_malloc.c aligned_alloc.c
+ CSRC-$(UCLIBC_HAS_ADVANCED_REALTIME) += posix_memalign.c
+ CSRC-$(UCLIBC_HAS_PTY) += grantpt.c unlockpt.c ptsname.c
+ CSRC-$(UCLIBC_HAS_ARC4RANDOM) += arc4random.c
+diff -ruN a/libc/stdlib/aligned_alloc.c b/libc/stdlib/aligned_alloc.c
+--- a/libc/stdlib/aligned_alloc.c	1970-01-01 00:00:00.000000000 +0000
++++ b/libc/stdlib/aligned_alloc.c	2026-09-10 12:34:45.232435892 +0000
+@@ -0,0 +1,27 @@
++/*
++ * C11 aligned_alloc().
++ *
++ * Licensed under the LGPL v2.1 or later.
++ */
++
++#include <stdlib.h>
++#include <malloc.h>
++#include <errno.h>
++
++void *
++aligned_alloc(size_t alignment, size_t size)
++{
++    /* Keep the supported alignment rules consistent with posix_memalign().
++     * C11 additionally requires SIZE to be an integral multiple of ALIGNMENT.
++     */
++    if (alignment == 0
++        || (alignment & (alignment - 1)) != 0
++        || alignment % sizeof(void *) != 0
++        || size % alignment != 0)
++    {
++        errno = EINVAL;
++        return NULL;
++    }
++
++    return memalign(alignment, size);
++}
