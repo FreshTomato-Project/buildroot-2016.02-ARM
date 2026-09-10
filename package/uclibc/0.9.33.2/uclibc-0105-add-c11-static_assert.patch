@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pedro311 <pedro311@gmail.com>
+Date: Thu, 10 Sep 2026 12:00:00 +0200
+Subject: [PATCH] assert.h: add ISO C11 static_assert macro
+
+The existing features.h backport enables __USE_ISOC11 for C11 builds,
+but uClibc 0.9.33.2's assert.h does not provide the C11 static_assert
+macro.
+
+GCC 7.5.0 supports the C11 _Static_assert keyword, so expose the
+standard static_assert spelling from <assert.h> when ISO C11 features
+are enabled.  Keep it disabled for C++ where static_assert is a
+language keyword.
+
+This mirrors the implementation used by glibc when C11 static
+assertions were introduced.
+
+---
+ include/assert.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+--- a/include/assert.h
++++ b/include/assert.h
+@@ -77,3 +77,9 @@
+ # endif
+ 
+ #endif /* NDEBUG.  */
++
++#if defined __USE_ISOC11 && !defined __cplusplus
++/* Static assertion.  Requires support in the compiler. */
++# undef static_assert
++# define static_assert _Static_assert
++#endif
+-- 
+2.39.5

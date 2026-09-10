@@ -1,0 +1,68 @@
+diff -ruN a/include/time.h b/include/time.h
+--- a/include/time.h	2012-05-15 07:20:09.000000000 +0000
++++ b/include/time.h	2026-09-10 10:47:00.532891574 +0000
+@@ -110,7 +110,7 @@
+ 
+ #if !defined __timespec_defined &&				\
+     ((defined _TIME_H &&					\
+-      (defined __USE_POSIX199309 || defined __USE_MISC)) ||	\
++      (defined __USE_POSIX199309 || defined __USE_MISC || defined __USE_ISOC11)) ||	\
+       defined __need_timespec)
+ # define __timespec_defined	1
+ 
+@@ -189,6 +189,14 @@
+ extern time_t time (time_t *__timer) __THROW;
+ libc_hidden_proto(time)
+ 
++#ifdef __USE_ISOC11
++/* Time base for timespec_get.  */
++# define TIME_UTC 1
++
++/* Set TS to the current calendar time based on BASE.  */
++extern int timespec_get (struct timespec *__ts, int __base) __THROW;
++#endif
++
+ #ifdef __UCLIBC_HAS_FLOATS__
+ /* Return the difference between TIME1 and TIME0.  */
+ extern double difftime (time_t __time1, time_t __time0)
+diff -ruN a/libc/misc/time/Makefile.in b/libc/misc/time/Makefile.in
+--- a/libc/misc/time/Makefile.in	2012-05-15 07:20:09.000000000 +0000
++++ b/libc/misc/time/Makefile.in	2026-09-10 10:47:00.533394319 +0000
+@@ -7,7 +7,7 @@
+ 
+ subdirs += libc/misc/time
+ 
+-CSRC := adjtime.c
++CSRC := adjtime.c timespec_get.c
+ ifeq ($(UCLIBC_SUSV3_LEGACY),y)
+ CSRC += ftime.c
+ endif
+diff -ruN a/libc/misc/time/timespec_get.c b/libc/misc/time/timespec_get.c
+--- a/libc/misc/time/timespec_get.c	1970-01-01 00:00:00.000000000 +0000
++++ b/libc/misc/time/timespec_get.c	2026-09-10 10:47:00.533053528 +0000
+@@ -0,0 +1,25 @@
++/*
++ * C11 timespec_get().
++ *
++ * Licensed under the LGPL v2.1 or later.
++ */
++
++#include <time.h>
++#include <sys/time.h>
++
++int
++timespec_get(struct timespec *ts, int base)
++{
++    struct timeval tv;
++
++    if (base != TIME_UTC)
++        return 0;
++
++    if (gettimeofday(&tv, NULL) != 0)
++        return 0;
++
++    ts->tv_sec = tv.tv_sec;
++    ts->tv_nsec = tv.tv_usec * 1000L;
++
++    return base;
++}
